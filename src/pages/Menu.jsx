@@ -3,55 +3,34 @@ import Menucomponent from '../components/Menu';
 import { getSpecialOffersConfig, refreshSpecialOffersConfig } from '../services/specialOffersService.js';
 import { getMenuData } from '../services/menuService.js';
 import PageLoading from '../components/PageLoading.jsx';
+import { usePageData } from '../hooks/usePageData';
 
 const Menu = () => {
-  const [specialOffersData, setSpecialOffersData] = useState(null);
-  const [menuData, setMenuData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // Define data sources for usePageData hook
+  const dataSources = [
+    getSpecialOffersConfig, // Special offers data (includes hero images)
+    getMenuData // Menu items data
+  ];
+
+  const dataNames = [
+    'specialOffers',
+    'menu'
+  ];
+
+  const { loading, error, data, refresh } = usePageData(dataSources, dataNames);
   const [imagesLoaded, setImagesLoaded] = useState(false);
-
-  useEffect(() => {
-    const fetchAllData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        console.log('MENU PAGE: Starting to fetch all data...');
-        
-        // Fetch both special offers and menu data in parallel
-        const [specialOffers, menu] = await Promise.all([
-          getSpecialOffersConfig(),
-          getMenuData()
-        ]);
-        
-        console.log('MENU PAGE: Received special offers data:', specialOffers);
-        console.log('MENU PAGE: Received menu data:', menu);
-        
-        setSpecialOffersData(specialOffers);
-        setMenuData(menu);
-        setError(null);
-      } catch (err) {
-        console.error('MENU PAGE: Error fetching data:', err);
-        setError('Failed to load menu content');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAllData();
-  }, []);
 
   // Handle image loading for hero images
   useEffect(() => {
-    if (!loading && specialOffersData) {
+    if (!loading && data && data.specialOffers) {
       const loadHeroImages = async () => {
         const imagesToLoad = [];
         
-        if (specialOffersData.heroImageDesktop) {
-          imagesToLoad.push(specialOffersData.heroImageDesktop);
+        if (data.specialOffers.heroImageDesktop) {
+          imagesToLoad.push(data.specialOffers.heroImageDesktop);
         }
-        if (specialOffersData.heroImageMobile) {
-          imagesToLoad.push(specialOffersData.heroImageMobile);
+        if (data.specialOffers.heroImageMobile) {
+          imagesToLoad.push(data.specialOffers.heroImageMobile);
         }
         
         if (imagesToLoad.length === 0) {
@@ -79,30 +58,15 @@ const Menu = () => {
       
       loadHeroImages();
     }
-  }, [loading, specialOffersData]);
+  }, [loading, data]);
 
   const handleRefresh = async () => {
     try {
-      setLoading(true);
       setImagesLoaded(false);
       console.log('MENU PAGE: Refreshing all data...');
-      
-      const [specialOffers, menu] = await Promise.all([
-        refreshSpecialOffersConfig(),
-        getMenuData()
-      ]);
-      
-      console.log('MENU PAGE: Refreshed special offers data:', specialOffers);
-      console.log('MENU PAGE: Refreshed menu data:', menu);
-      
-      setSpecialOffersData(specialOffers);
-      setMenuData(menu);
-      setError(null);
+      await refresh(); // This will bypass cache and fetch fresh data
     } catch (err) {
       console.error('MENU PAGE: Error refreshing data:', err);
-      setError('Failed to refresh menu content');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -127,6 +91,9 @@ const Menu = () => {
       </div>
     );
   }
+
+  const specialOffersData = data?.specialOffers;
+  const menuData = data?.menu;
 
   return (
     <div>

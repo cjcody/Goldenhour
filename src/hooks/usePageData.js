@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
+import { getCachedData, setCachedData } from '../utils/simpleCache';
 
 /**
- * Custom hook for page-level data loading
+ * Custom hook for page-level data loading with simple caching
  * @param {Array} dataSources - Array of async functions that return data
  * @param {Array} dataNames - Array of names for each data source
  * @returns {Object} - { loading, error, data, refresh }
@@ -11,10 +12,26 @@ export const usePageData = (dataSources, dataNames) => {
   const [error, setError] = useState(null);
   const [data, setData] = useState({});
 
-  const fetchAllData = async () => {
+  const fetchAllData = async (useCache = true) => {
     try {
       setLoading(true);
       setError(null);
+
+      // Create a cache key based on data sources
+      const cacheKey = dataNames.join('_');
+
+      // Check cache first if enabled
+      if (useCache) {
+        const cachedData = getCachedData(cacheKey);
+        if (cachedData) {
+          console.log('Using cached data for:', cacheKey);
+          setData(cachedData);
+          setLoading(false);
+          return;
+        }
+      }
+
+      console.log('Fetching fresh data for:', cacheKey);
 
       // Fetch all data sources in parallel
       const results = await Promise.all(
@@ -43,6 +60,11 @@ export const usePageData = (dataSources, dataNames) => {
 
       setData(dataObject);
 
+      // Cache the successful data
+      if (Object.keys(dataObject).length > 0) {
+        setCachedData(cacheKey, dataObject);
+      }
+
       // Set error if any data sources failed
       if (errors.length > 0) {
         setError(`Some data failed to load: ${errors.join(', ')}`);
@@ -56,11 +78,11 @@ export const usePageData = (dataSources, dataNames) => {
   };
 
   useEffect(() => {
-    fetchAllData();
+    fetchAllData(true); // Use cache by default
   }, []); // Empty dependency array means this runs once on mount
 
   const refresh = () => {
-    fetchAllData();
+    fetchAllData(false); // Skip cache on refresh
   };
 
   return { loading, error, data, refresh };

@@ -3,6 +3,43 @@ import { getContactConfig } from '../services/contactService';
 import { extractGoogleMapsUrl, createSafeMapIframe } from '../utils/mapHelpers';
 import PageLoading from './PageLoading'; // adjust path if needed
 
+// Simple cache utility for this component
+const getCachedData = (key) => {
+  try {
+    const cached = sessionStorage.getItem(key);
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached);
+      const now = Date.now();
+      const cacheAge = now - timestamp;
+      const cacheExpiry = 5 * 60 * 1000; // 5 minutes
+      
+      if (cacheAge < cacheExpiry) {
+        console.log(`CONTACT COMPONENT: Using cached data for ${key}`);
+        return data;
+      } else {
+        console.log(`CONTACT COMPONENT: Cache expired for ${key}, removing`);
+        sessionStorage.removeItem(key);
+      }
+    }
+  } catch (err) {
+    console.warn('CONTACT COMPONENT: Error reading cache:', err);
+  }
+  return null;
+};
+
+const setCachedData = (key, data) => {
+  try {
+    const cacheData = {
+      data,
+      timestamp: Date.now()
+    };
+    sessionStorage.setItem(key, JSON.stringify(cacheData));
+    console.log(`CONTACT COMPONENT: Cached data for ${key}`);
+  } catch (err) {
+    console.warn('CONTACT COMPONENT: Error setting cache:', err);
+  }
+};
+
 const Contact = () => {
   const [formData, setFormData] = useState({
     name: '',
@@ -23,8 +60,21 @@ const Contact = () => {
       try {
         setLoading(true);
         setImagesLoaded(false);
+        
+        // Check cache first
+        const cachedData = getCachedData('contactData');
+        if (cachedData) {
+          setContactConfig(cachedData);
+          setLoading(false);
+          return;
+        }
+        
+        console.log('CONTACT COMPONENT: Fetching fresh data...');
         const config = await getContactConfig();
         setContactConfig(config);
+        
+        // Cache the data
+        setCachedData('contactData', config);
       } catch (error) {
         console.error('Error fetching contact config:', error);
       } finally {

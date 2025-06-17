@@ -2,33 +2,27 @@ import React, { useState, useEffect } from 'react';
 import CustomOrderForm from '../components/CustomOrderForm';
 import { getCustomOrderConfig } from '../services/customOrderService';
 import PageLoading from '../components/PageLoading';
+import { usePageData } from '../hooks/usePageData';
 
 const CustomOrder = () => {
-  const [config, setConfig] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Define data sources for usePageData hook
+  const dataSources = [
+    getCustomOrderConfig // Custom order configuration data
+  ];
+
+  const dataNames = [
+    'customOrder'
+  ];
+
+  const { loading, error, data, refresh } = usePageData(dataSources, dataNames);
   const [imagesLoaded, setImagesLoaded] = useState(false);
-
-  useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        const customOrderConfig = await getCustomOrderConfig();
-        setConfig(customOrderConfig);
-      } catch (error) {
-        console.error('Error fetching custom order config:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchConfig();
-  }, []);
 
   // Wait for hero images to load
   useEffect(() => {
-    if (!loading && config) {
+    if (!loading && data && data.customOrder) {
       const imagesToLoad = [];
-      if (config.heroImageDesktop) imagesToLoad.push(config.heroImageDesktop);
-      if (config.heroImageMobile) imagesToLoad.push(config.heroImageMobile);
+      if (data.customOrder.heroImageDesktop) imagesToLoad.push(data.customOrder.heroImageDesktop);
+      if (data.customOrder.heroImageMobile) imagesToLoad.push(data.customOrder.heroImageMobile);
       if (imagesToLoad.length === 0) {
         setImagesLoaded(true);
         return;
@@ -43,11 +37,39 @@ const CustomOrder = () => {
         img.src = src;
       });
     }
-  }, [loading, config]);
+  }, [loading, data]);
+
+  const handleRefresh = async () => {
+    try {
+      setImagesLoaded(false);
+      await refresh(); // This will bypass cache and fetch fresh data
+    } catch (err) {
+      console.error('CUSTOM ORDER: Error refreshing data:', err);
+    }
+  };
 
   if (loading || !imagesLoaded) {
     return <PageLoading pageName="Custom Order" />;
   }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">Error Loading Content</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button 
+            onClick={handleRefresh} 
+            className="bg-amber-600 text-white px-6 py-2 rounded-lg hover:bg-amber-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const config = data?.customOrder;
 
   return (
     <div>

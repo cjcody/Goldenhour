@@ -2,6 +2,43 @@ import React, { useState, useEffect } from 'react';
 import { getAboutConfig, refreshAboutConfig } from '../services/aboutService.js';
 import PageLoading from './PageLoading.jsx';
 
+// Simple cache utility for this component
+const getCachedData = (key) => {
+  try {
+    const cached = sessionStorage.getItem(key);
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached);
+      const now = Date.now();
+      const cacheAge = now - timestamp;
+      const cacheExpiry = 5 * 60 * 1000; // 5 minutes
+      
+      if (cacheAge < cacheExpiry) {
+        console.log(`ABOUT COMPONENT: Using cached data for ${key}`);
+        return data;
+      } else {
+        console.log(`ABOUT COMPONENT: Cache expired for ${key}, removing`);
+        sessionStorage.removeItem(key);
+      }
+    }
+  } catch (err) {
+    console.warn('ABOUT COMPONENT: Error reading cache:', err);
+  }
+  return null;
+};
+
+const setCachedData = (key, data) => {
+  try {
+    const cacheData = {
+      data,
+      timestamp: Date.now()
+    };
+    sessionStorage.setItem(key, JSON.stringify(cacheData));
+    console.log(`ABOUT COMPONENT: Cached data for ${key}`);
+  } catch (err) {
+    console.warn('ABOUT COMPONENT: Error setting cache:', err);
+  }
+};
+
 const Aboutinfo = () => {
   const [aboutData, setAboutData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -13,9 +50,23 @@ const Aboutinfo = () => {
       try {
         setLoading(true);
         setImagesLoaded(false);
+        
+        // Check cache first
+        const cachedData = getCachedData('aboutData');
+        if (cachedData) {
+          setAboutData(cachedData);
+          setError(null);
+          setLoading(false);
+          return;
+        }
+        
+        console.log('ABOUT COMPONENT: Fetching fresh data...');
         const data = await getAboutConfig();
         setAboutData(data);
         setError(null);
+        
+        // Cache the data
+        setCachedData('aboutData', data);
       } catch (err) {
         console.error('ABOUT COMPONENT: Error fetching about data:', err);
         setError('Failed to load about page content');
@@ -51,11 +102,18 @@ const Aboutinfo = () => {
   const handleRefresh = async () => {
     try {
       setLoading(true);
+      setImagesLoaded(false);
       console.log('ABOUT COMPONENT: Refreshing about data...');
+      
+      // Clear cache and fetch fresh data
+      sessionStorage.removeItem('aboutData');
       const data = await refreshAboutConfig();
       console.log('ABOUT COMPONENT: Refreshed about data:', data);
       setAboutData(data);
       setError(null);
+      
+      // Cache the fresh data
+      setCachedData('aboutData', data);
     } catch (err) {
       console.error('ABOUT COMPONENT: Error refreshing about data:', err);
       setError('Failed to refresh about page content');
